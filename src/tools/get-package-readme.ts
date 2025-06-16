@@ -24,8 +24,49 @@ export async function getPackageReadme(params: GetPackageReadmeParams): Promise<
       return cached;
     }
 
-    // Get package information from Conan Center
-    const recipeInfo = await conanCenterApi.getRecipeInfo(packageName);
+    // First, verify package exists by trying to get its recipe info
+    logger.debug(`Checking package existence: ${packageName}`);
+    let recipeInfo;
+    let packageExists = true;
+    
+    try {
+      recipeInfo = await conanCenterApi.getRecipeInfo(packageName);
+      logger.debug(`Package found: ${packageName}`);
+    } catch (error) {
+      logger.debug(`Package not found: ${packageName}`);
+      packageExists = false;
+      
+      // Return a response indicating the package doesn't exist
+      const result: PackageReadmeResponse = {
+        package_name: packageName,
+        version: version,
+        description: '',
+        readme_content: '',
+        usage_examples: [],
+        installation: {
+          conan: `conan install --requires=${packageName}/${version}@`,
+          cmake: `find_package(${packageName} REQUIRED)`,
+        },
+        basic_info: {
+          name: packageName,
+          version: version,
+          description: '',
+          license: '',
+          author: '',
+          topics: [],
+        },
+        exists: false,
+      };
+      
+      // Cache the negative result briefly
+      cache.set(cacheKey, result, 300 * 1000); // Cache for 5 minutes
+      
+      return result;
+    }
+    
+    if (!packageExists || !recipeInfo) {
+      throw new Error(`Failed to get package information for '${packageName}'`);
+    }
     
     // Determine the actual version to use
     let actualVersion = version;
@@ -88,6 +129,7 @@ export async function getPackageReadme(params: GetPackageReadmeParams): Promise<
       installation,
       basic_info: basicInfo,
       repository,
+      exists: true,
     };
 
     // Cache the result

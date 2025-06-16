@@ -22,8 +22,38 @@ export async function getPackageInfo(params: GetPackageInfoParams): Promise<Pack
       return cached;
     }
 
-    // Get package information from Conan Center
-    const recipeInfo = await conanCenterApi.getRecipeInfo(packageName);
+    // Verify package exists by trying to get its recipe info
+    logger.debug(`Checking package existence: ${packageName}`);
+    let recipeInfo;
+    let packageExists = true;
+    
+    try {
+      recipeInfo = await conanCenterApi.getRecipeInfo(packageName);
+      logger.debug(`Package found: ${packageName}`);
+    } catch (error) {
+      logger.debug(`Package not found: ${packageName}`);
+      packageExists = false;
+      
+      // Return a response indicating the package doesn't exist
+      const result: PackageInfoResponse = {
+        package_name: packageName,
+        latest_version: '',
+        description: '',
+        author: '',
+        license: '',
+        topics: [],
+        exists: false,
+      };
+      
+      // Cache the negative result briefly
+      cache.set(cacheKey, result, 300 * 1000); // Cache for 5 minutes
+      
+      return result;
+    }
+    
+    if (!packageExists || !recipeInfo) {
+      throw new Error(`Failed to get package information for '${packageName}'`);
+    }
 
     // Get recipe details for dependencies and options if requested
     let dependencies: string[] | undefined;
@@ -61,6 +91,7 @@ export async function getPackageInfo(params: GetPackageInfoParams): Promise<Pack
       dependencies,
       options,
       repository,
+      exists: true,
     };
 
     // Cache the result

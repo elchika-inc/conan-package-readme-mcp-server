@@ -3,6 +3,8 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import {
   CallToolRequestSchema,
   ErrorCode,
+  ListPromptsRequestSchema,
+  ListResourcesRequestSchema,
   ListToolsRequestSchema,
   McpError,
 } from '@modelcontextprotocol/sdk/types.js';
@@ -40,7 +42,7 @@ const TOOL_DEFINITIONS = {
           type: 'boolean',
           description: 'Whether to include usage examples (default: true)',
           default: true,
-        },
+        }
       },
       required: ['package_name'],
     },
@@ -64,7 +66,7 @@ const TOOL_DEFINITIONS = {
           type: 'boolean',
           description: 'Whether to include package options (default: false)',
           default: false,
-        },
+        }
       },
       required: ['package_name'],
     },
@@ -85,7 +87,7 @@ const TOOL_DEFINITIONS = {
           default: 20,
           minimum: 1,
           maximum: 100,
-        },
+        }
       },
       required: ['query'],
     },
@@ -104,7 +106,9 @@ export class ConanPackageReadmeMcpServer {
       {
         capabilities: {
           tools: {},
-        },
+          prompts: {},
+          resources: {}
+        }
       }
     );
 
@@ -113,14 +117,24 @@ export class ConanPackageReadmeMcpServer {
 
   private setupHandlers(): void {
     // List available tools
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+    (this.server as any).setRequestHandler(ListToolsRequestSchema, async () => {
       return {
         tools: Object.values(TOOL_DEFINITIONS),
       };
     });
 
+    // Handle prompts list
+    (this.server as any).setRequestHandler(ListPromptsRequestSchema, async () => {
+      return { prompts: [] };
+    });
+
+    // Handle resources list
+    (this.server as any).setRequestHandler(ListResourcesRequestSchema, async () => {
+      return { resources: [] };
+    });
+
     // Handle tool calls
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    (this.server as any).setRequestHandler(CallToolRequestSchema, async (request: any, _extra: any) => {
       const { name, arguments: args } = request.params;
       
 
@@ -226,9 +240,9 @@ export class ConanPackageReadmeMcpServer {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
+          text: JSON.stringify(result, null, 2)
+        }
+      ]
     };
   }
 
@@ -286,9 +300,9 @@ export class ConanPackageReadmeMcpServer {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
+          text: JSON.stringify(result, null, 2)
+        }
+      ]
     };
   }
 
@@ -337,9 +351,9 @@ export class ConanPackageReadmeMcpServer {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
+          text: JSON.stringify(result, null, 2)
+        }
+      ]
     };
   }
 
@@ -366,7 +380,7 @@ export class ConanPackageReadmeMcpServer {
   async run(): Promise<void> {
     try {
       const transport = new StdioServerTransport();
-      await this.server.connect(transport);
+      await (this.server as any).connect(transport);
     } catch (error) {
       logger.error('Failed to start server transport', { error });
       throw error;
@@ -374,7 +388,7 @@ export class ConanPackageReadmeMcpServer {
   }
 
   async stop(): Promise<void> {
-    await this.server.close();
+    await (this.server as any).close();
   }
 }
 
