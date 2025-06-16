@@ -1,0 +1,74 @@
+import { cache, createCacheKey } from '../services/cache.js';
+import { conanCenterApi } from '../services/conan-center-api.js';
+import { logger } from '../utils/logger.js';
+import { validatePackageName, validateBoolean } from '../utils/validators.js';
+import { handleApiError } from '../utils/error-handler.js';
+import type { GetPackageInfoParams, PackageInfoResponse, RepositoryInfo } from '../types/index.js';
+
+export async function getPackageInfo(params: GetPackageInfoParams): Promise<PackageInfoResponse> {
+  try {
+    // Validate parameters
+    const packageName = validatePackageName(params.package_name);
+    const includeDependencies = validateBoolean(params.include_dependencies, 'include_dependencies') ?? true;
+    const includeOptions = validateBoolean(params.include_options, 'include_options') ?? false;
+
+    logger.debug(`Getting package info for ${packageName}`);
+
+    // Check cache first
+    const cacheKey = createCacheKey.packageInfo(packageName, 'latest');
+    const cached = cache.get<PackageInfoResponse>(cacheKey);
+    if (cached) {
+      logger.debug(`Using cached info for ${packageName}`);
+      return cached;
+    }
+
+    // Get package information from Conan Center
+    const recipeInfo = await conanCenterApi.getRecipeInfo(packageName);
+
+    // Get recipe details for dependencies and options if requested
+    let dependencies: string[] | undefined;
+    let options: Record<string, unknown> | undefined;
+
+    if (includeDependencies || includeOptions) {
+      const recipeDetails = await conanCenterApi.getRecipeDetails(packageName, recipeInfo.latest_version);
+      
+      if (recipeDetails) {
+        if (includeDependencies) {
+          dependencies = recipeDetails.requires;
+        }
+        if (includeOptions) {
+          options = recipeDetails.options;
+        }
+      }
+    }
+
+    // Create repository info
+    let repository: RepositoryInfo | undefined;
+    if (recipeInfo.homepage) {
+      repository = {
+        type: 'git',
+        url: recipeInfo.homepage,
+      };
+    }
+
+    const result: PackageInfoResponse = {
+      package_name: packageName,
+      latest_version: recipeInfo.latest_version,
+      description: recipeInfo.description,
+      author: recipeInfo.author,
+      license: recipeInfo.license,
+      topics: recipeInfo.topics,
+      dependencies,
+      options,
+      repository,
+    };
+
+    // Cache the result
+    cache.set(cacheKey, result, 1800 * 1000); // Cache for 30 minutes
+
+    logger.info(`Successfully retrieved info for ${packageName}`);
+    return result;
+  } catch (error) {
+    handleApiError(error, `get package info for ${params.package_name}`);
+  }
+}
