@@ -23,8 +23,8 @@ import {
 } from './types/index.js';
 
 const TOOL_DEFINITIONS = {
-  get_package_readme: {
-    name: 'get_package_readme',
+  get_readme_from_conan: {
+    name: 'get_readme_from_conan',
     description: 'Get package README and usage examples from Conan Center',
     inputSchema: {
       type: 'object',
@@ -47,8 +47,8 @@ const TOOL_DEFINITIONS = {
       required: ['package_name'],
     },
   },
-  get_package_info: {
-    name: 'get_package_info',
+  get_package_info_from_conan: {
+    name: 'get_package_info_from_conan',
     description: 'Get package basic information and dependencies from Conan Center',
     inputSchema: {
       type: 'object',
@@ -71,8 +71,8 @@ const TOOL_DEFINITIONS = {
       required: ['package_name'],
     },
   },
-  search_packages: {
-    name: 'search_packages',
+  search_packages_from_conan: {
+    name: 'search_packages_from_conan',
     description: 'Search for packages in Conan Center',
     inputSchema: {
       type: 'object',
@@ -148,13 +148,13 @@ export class ConanPackageReadmeMcpServer {
         }
 
         switch (name) {
-          case 'get_package_readme':
+          case 'get_readme_from_conan':
             return await this.handleGetPackageReadme(this.validateGetPackageReadmeParams(args));
           
-          case 'get_package_info':
+          case 'get_package_info_from_conan':
             return await this.handleGetPackageInfo(this.validateGetPackageInfoParams(args));
           
-          case 'search_packages':
+          case 'search_packages_from_conan':
             return await this.handleSearchPackages(this.validateSearchPackagesParams(args));
           
           default:

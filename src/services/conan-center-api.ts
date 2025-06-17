@@ -2,7 +2,7 @@ import { logger } from '../utils/logger.js';
 import { handleApiError } from '../utils/error-handler.js';
 import type { ConanCenterSearchResponse, ConanCenterRecipeResponse, ConanRecipeDetails } from '../types/index.js';
 
-const CONAN_CENTER_BASE_URL = 'https://center.conan.io/api';
+const CONAN_CENTER_INDEX_REPO = 'https://api.github.com/repos/conan-io/conan-center-index';
 const REQUEST_TIMEOUT = 10000; // 10 seconds
 
 export class ConanCenterApi {
@@ -31,11 +31,10 @@ export class ConanCenterApi {
 
   async searchPackages(query: string, limit: number = 20): Promise<ConanCenterSearchResponse> {
     try {
-      const searchUrl = new URL(`${CONAN_CENTER_BASE_URL}/search`);
-      searchUrl.searchParams.set('q', query);
-      searchUrl.searchParams.set('size', limit.toString());
-
-      logger.debug(`Searching packages: ${searchUrl.toString()}`);
+      // Search for recipe folders in the conan-center-index repository
+      const searchUrl = new URL(`${CONAN_CENTER_INDEX_REPO}/contents/recipes`);
+      
+      logger.debug(`Searching packages in Conan Center Index: ${searchUrl.toString()}`);
 
       const response = await this.fetchWithTimeout(searchUrl.toString());
 
@@ -43,10 +42,32 @@ export class ConanCenterApi {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const data = await response.json() as ConanCenterSearchResponse;
-      logger.debug(`Found ${data.results?.length || 0} packages for query: ${query}`);
+      const recipeFolders = await response.json() as Array<{name: string, type: string}>;
+      
+      // Filter folders that match the query (case-insensitive)
+      const matchingRecipes = recipeFolders
+        .filter(folder => folder.type === 'dir' && 
+                folder.name.toLowerCase().includes(query.toLowerCase()))
+        .slice(0, limit)
+        .map(folder => ({
+          name: folder.name,
+          description: `Conan package for ${folder.name}`,
+          topics: [],
+          license: 'Unknown',
+          author: 'Conan Center',
+          homepage: '',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          latest_version: 'unknown'
+        }));
 
-      return data;
+      const result: ConanCenterSearchResponse = {
+        results: matchingRecipes,
+        total_count: matchingRecipes.length
+      };
+
+      logger.debug(`Found ${matchingRecipes.length} packages for query: ${query}`);
+      return result;
     } catch (error) {
       handleApiError(error, 'Conan Center search');
     }
@@ -54,7 +75,8 @@ export class ConanCenterApi {
 
   async getRecipeInfo(packageName: string): Promise<ConanCenterRecipeResponse> {
     try {
-      const recipeUrl = `${CONAN_CENTER_BASE_URL}/recipes/${encodeURIComponent(packageName)}`;
+      // Get the recipe folder contents from GitHub
+      const recipeUrl = `${CONAN_CENTER_INDEX_REPO}/contents/recipes/${encodeURIComponent(packageName)}`;
       
       logger.debug(`Fetching recipe info: ${recipeUrl}`);
 
@@ -68,9 +90,46 @@ export class ConanCenterApi {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const data = await response.json() as ConanCenterRecipeResponse;
-      logger.debug(`Fetched recipe info for: ${packageName}`);
+      const folderContents = await response.json() as Array<{name: string, type: string}>;
+      
+      // Get available versions (folder names that look like versions)
+      const versionFolders = folderContents
+        .filter(item => item.type === 'dir')
+        .map(item => item.name)
+        .filter(name => /^\d+\.\d+/.test(name)); // Basic version pattern
+      
+      // Sort versions to get the latest
+      const sortedVersions = versionFolders.sort((a, b) => {
+        // Simple version comparison - this could be improved
+        const aNum = parseFloat(a.split('.')[0] + '.' + a.split('.')[1]);
+        const bNum = parseFloat(b.split('.')[0] + '.' + b.split('.')[1]);
+        return bNum - aNum;
+      });
 
+      const latestVersion = sortedVersions[0] || 'unknown';
+      
+      // Build version map
+      const versions: {[key: string]: {revisions: any[]}} = {};
+      versionFolders.forEach(version => {
+        versions[version] = { 
+          revisions: [{ id: 'latest', timestamp: new Date().toISOString() }] 
+        };
+      });
+
+      const data: ConanCenterRecipeResponse = {
+        name: packageName,
+        latest_version: latestVersion,
+        versions: versions,
+        description: `Conan package for ${packageName}`,
+        license: 'Unknown',
+        author: 'Conan Center',
+        homepage: '',
+        topics: [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      logger.debug(`Fetched recipe info for: ${packageName}`);
       return data;
     } catch (error) {
       handleApiError(error, `Conan Center recipe for ${packageName}`);
