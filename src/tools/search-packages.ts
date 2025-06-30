@@ -3,7 +3,7 @@ import { conanCenterApi } from '../services/conan-center-api.js';
 import { logger } from '../utils/logger.js';
 import { validateSearchQuery, validateLimit } from '../utils/validators.js';
 import { handleApiError } from '../utils/error-handler.js';
-import type { SearchPackagesParams, SearchPackagesResponse, ConanPackageSearchResult } from '../types/index.js';
+import type { SearchPackagesParams, SearchPackagesResponse } from '../types/index.js';
 
 export async function searchPackages(params: SearchPackagesParams): Promise<SearchPackagesResponse> {
   try {
@@ -24,29 +24,18 @@ export async function searchPackages(params: SearchPackagesParams): Promise<Sear
     // Search packages using Conan Center API
     const searchResponse = await conanCenterApi.searchPackages(query, limit);
 
-    // Transform the results to our format
-    const packages: ConanPackageSearchResult[] = searchResponse.results.map(pkg => ({
-      name: pkg.name,
-      version: pkg.latest_version,
-      description: pkg.description,
-      topics: pkg.topics,
-      author: pkg.author,
-      homepage: pkg.homepage,
-      license: pkg.license,
-      created_at: pkg.created_at,
-      updated_at: pkg.updated_at,
-    }));
+    // Use the results directly from the API response
 
     const result: SearchPackagesResponse = {
       query,
-      total: searchResponse.total_count,
-      packages,
+      results: searchResponse.results,
+      total_count: searchResponse.total_count,
     };
 
     // Cache the result
     cache.set(cacheKey, result, 900 * 1000); // Cache for 15 minutes
 
-    logger.info(`Found ${packages.length} packages for query: "${query}"`);
+    logger.info(`Found ${searchResponse.results.length} packages for query: "${query}"`);
     return result;
   } catch (error) {
     handleApiError(error, `search packages with query "${params.query}"`);

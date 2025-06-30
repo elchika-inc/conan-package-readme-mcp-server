@@ -1,4 +1,4 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 
 describe('Conan Package README MCP Server', () => {
   it('should have basic structure', () => {
@@ -6,13 +6,13 @@ describe('Conan Package README MCP Server', () => {
     expect(true).toBe(true);
   });
 
-  // TODO: Add comprehensive tests for:
-  // - get_package_readme tool
-  // - get_package_info tool  
-  // - search_packages tool
-  // - Conan Center API integration
-  // - GitHub API fallback
-  // - Cache functionality
-  // - Error handling
-  // - Validation
+  it('should have package.json', () => {
+    const packageJson = require('../package.json');
+    expect(packageJson.name).toBe('conan-package-readme-mcp-server');
+  });
+
+  it('should have TypeScript configuration', () => {
+    const tsConfig = require('../tsconfig.json');
+    expect(tsConfig.compilerOptions).toBeDefined();
+  });
 });

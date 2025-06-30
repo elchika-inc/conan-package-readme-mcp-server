@@ -36,6 +36,7 @@ export async function getPackageInfo(params: GetPackageInfoParams): Promise<Pack
       
       // Return a response indicating the package doesn't exist
       const result: PackageInfoResponse = {
+        name: packageName,
         package_name: packageName,
         latest_version: '',
         description: '',
@@ -82,15 +83,20 @@ export async function getPackageInfo(params: GetPackageInfoParams): Promise<Pack
     }
 
     const result: PackageInfoResponse = {
+      name: packageName,
       package_name: packageName,
       latest_version: recipeInfo.latest_version,
+      versions: Object.keys(recipeInfo.versions).sort(),
       description: recipeInfo.description,
       author: recipeInfo.author,
       license: recipeInfo.license,
+      ...(recipeInfo.homepage && { homepage: recipeInfo.homepage }),
       topics: recipeInfo.topics,
       dependencies,
       options,
       repository,
+      ...(recipeInfo.created_at && { created_at: recipeInfo.created_at }),
+      ...(recipeInfo.updated_at && { updated_at: recipeInfo.updated_at }),
       exists: true,
     };
 

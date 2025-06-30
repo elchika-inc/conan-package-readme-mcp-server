@@ -82,22 +82,27 @@ export interface PackageReadmeResponse {
 }
 
 export interface PackageInfoResponse {
-  package_name: string;
+  name: string;
+  package_name?: string;
   latest_version: string;
+  versions?: string[];
   description: string;
   author: string;
   license: string;
+  homepage?: string;
   topics: string[];
   dependencies?: string[] | undefined;
   options?: Record<string, unknown> | undefined;
   repository?: RepositoryInfo | undefined;
+  created_at?: string;
+  updated_at?: string;
   exists: boolean;
 }
 
 export interface SearchPackagesResponse {
   query: string;
-  total: number;
-  packages: ConanPackageSearchResult[];
+  results: ConanCenterPackage[];
+  total_count: number;
 }
 
 // Cache Types
